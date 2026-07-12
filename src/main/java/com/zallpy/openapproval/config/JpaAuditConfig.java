@@ -1,10 +1,11 @@
 package com.zallpy.openapproval.config;
 
-import com.zallpy.openapproval.common.security.SpringSecurityAuditorAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+import com.zallpy.openapproval.audit.SpringSecurityAuditorAware;
 
 import java.util.UUID;
 

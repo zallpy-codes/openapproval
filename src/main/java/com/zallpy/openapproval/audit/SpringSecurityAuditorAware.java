@@ -1,4 +1,4 @@
-package com.zallpy.openapproval.common.security;
+package com.zallpy.openapproval.audit;
 
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
