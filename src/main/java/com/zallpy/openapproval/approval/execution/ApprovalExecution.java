@@ -6,6 +6,8 @@ import com.zallpy.openapproval.approval.runtime.ApprovalRequest;
 import com.zallpy.openapproval.common.entity.ActiveEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -36,31 +38,13 @@ import java.util.UUID;
  * @since 1.0.0
  */
 @Entity
-@Table(
-        name = "approval_executions",
-        indexes = {
-                @Index(
-                        name = "idx_execution_request",
-                        columnList = "approval_request_id"
-                ),
-                @Index(
-                        name = "idx_execution_policy",
-                        columnList = "approval_policy_id"
-                ),
-                @Index(
-                        name = "idx_execution_status",
-                        columnList = "execution_status"
-                ),
-                @Index(
-                        name = "idx_execution_reference",
-                        columnList = "execution_reference"
-                ),
-                @Index(
-                        name = "idx_execution_active",
-                        columnList = "active"
-                )
-        }
-)
+@Table(name = "approval_executions", indexes = {
+        @Index(name = "idx_execution_request", columnList = "approval_request_id"),
+        @Index(name = "idx_execution_policy", columnList = "approval_policy_id"),
+        @Index(name = "idx_execution_status", columnList = "execution_status"),
+        @Index(name = "idx_execution_reference", columnList = "execution_reference"),
+        @Index(name = "idx_execution_active", columnList = "active")
+})
 public class ApprovalExecution extends ActiveEntity {
 
     @Serial
@@ -94,12 +78,7 @@ public class ApprovalExecution extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 100)
-    @Column(
-            name = "execution_reference",
-            nullable = false,
-            unique = true,
-            length = 100
-    )
+    @Column(name = "execution_reference", nullable = false, unique = true, length = 100)
     private String executionReference;
 
     /**
@@ -121,9 +100,9 @@ public class ApprovalExecution extends ActiveEntity {
      * Current execution status.
      */
     @NotNull
+    @Enumerated(EnumType.STRING)
     @Column(name = "execution_status", nullable = false, length = 40)
-    private ApprovalExecutionStatus executionStatus =
-            ApprovalExecutionStatus.CREATED;
+    private ApprovalExecutionStatus executionStatus = ApprovalExecutionStatus.CREATED;
 
     /**
      * Execution start time.
@@ -142,7 +121,7 @@ public class ApprovalExecution extends ActiveEntity {
      */
     @Column(name = "due_at")
     private LocalDateTime dueAt;
-        /**
+    /**
      * Current stage number being executed.
      */
     @Column(name = "current_stage_order")
@@ -253,7 +232,7 @@ public class ApprovalExecution extends ActiveEntity {
         return Objects.hash(getId());
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Business Methods
     // -------------------------------------------------------------------------
 
@@ -330,12 +309,12 @@ public class ApprovalExecution extends ActiveEntity {
      * Moves execution to the specified stage.
      *
      * @param stageOrder stage order
-     * @param stageCode stage code
-     * @param stageName stage name
+     * @param stageCode  stage code
+     * @param stageName  stage name
      */
     public void moveToStage(final Integer stageOrder,
-                            final String stageCode,
-                            final String stageName) {
+            final String stageCode,
+            final String stageName) {
 
         this.currentStageOrder = stageOrder;
         this.currentStageCode = stageCode;
@@ -443,7 +422,7 @@ public class ApprovalExecution extends ActiveEntity {
                 && completedStages.equals(totalStages);
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Getters and Setters
     // -------------------------------------------------------------------------
 
@@ -607,8 +586,6 @@ public class ApprovalExecution extends ActiveEntity {
         this.completed = completed;
     }
 
-  
-
     public void setSuspended(boolean suspended) {
         this.suspended = suspended;
     }
@@ -625,7 +602,7 @@ public class ApprovalExecution extends ActiveEntity {
         this.completionRemarks = completionRemarks;
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Validation
     // -------------------------------------------------------------------------
 
@@ -738,6 +715,36 @@ public class ApprovalExecution extends ActiveEntity {
      */
     public boolean isInProgress() {
         return executionStatus == ApprovalExecutionStatus.IN_PROGRESS;
+    }
+
+    public boolean isCompletedSuccessfully() {
+        return executionStatus == ApprovalExecutionStatus.COMPLETED;
+    }
+
+    public boolean hasCurrentStage() {
+        return currentStageOrder != null;
+    }
+
+    public boolean canStart() {
+        return !started
+                && !completed
+                && !cancelled;
+    }
+
+    public boolean canResume() {
+        return suspended
+                && !completed
+                && !cancelled;
+    }
+
+    public boolean canCancel() {
+        return !completed
+                && !cancelled;
+    }
+
+    public boolean hasCompletionRemarks() {
+        return completionRemarks != null
+                && !completionRemarks.isBlank();
     }
 
     @Override
