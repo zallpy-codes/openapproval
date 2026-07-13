@@ -18,7 +18,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -134,7 +133,7 @@ public class ApprovalPolicyStage extends ActiveEntity {
      */
     @Min(1)
     @Column(name = "minimum_approvals")
-    private Integer minimumApprovals = 1;
+    private Integer requiredApprovals = 1;
 
     /**
      * Maximum approvals accepted.
@@ -144,12 +143,15 @@ public class ApprovalPolicyStage extends ActiveEntity {
     private Integer maximumApprovals;
 
     /**
-     * Percentage quorum required.
+     * Minimum number of approvals required when
+     * {@link ApprovalMode#QUORUM} is used.
+     *
+     * <p>
+     * This value is ignored for other approval modes.
      */
     @Min(1)
-    @Max(100)
-    @Column(name = "approval_quorum_percent")
-    private Integer approvalQuorumPercent;
+    @Column(name = "quorum_count", nullable = false)
+    private Integer quorumCount = 1;
 
     /**
      * Stage-specific SLA override in minutes.
@@ -314,6 +316,15 @@ public class ApprovalPolicyStage extends ActiveEntity {
         return approvalPolicy;
     }
 
+    /**
+     * Returns the configured quorum count.
+     *
+     * @return quorum count
+     */
+    public Integer getQuorumCount() {
+        return quorumCount;
+    }
+
     public void setApprovalPolicy(ApprovalPolicy approvalPolicy) {
         this.approvalPolicy = approvalPolicy;
     }
@@ -374,12 +385,12 @@ public class ApprovalPolicyStage extends ActiveEntity {
         this.decisionMode = decisionMode;
     }
 
-    public Integer getMinimumApprovals() {
-        return minimumApprovals;
+    public Integer getRequiredApprovals() {
+        return requiredApprovals;
     }
 
-    public void setMinimumApprovals(Integer minimumApprovals) {
-        this.minimumApprovals = minimumApprovals;
+    public void setRequiredApprovals(Integer requiredApprovals) {
+        this.requiredApprovals = requiredApprovals;
     }
 
     public Integer getMaximumApprovals() {
@@ -388,14 +399,6 @@ public class ApprovalPolicyStage extends ActiveEntity {
 
     public void setMaximumApprovals(Integer maximumApprovals) {
         this.maximumApprovals = maximumApprovals;
-    }
-
-    public Integer getApprovalQuorumPercent() {
-        return approvalQuorumPercent;
-    }
-
-    public void setApprovalQuorumPercent(Integer approvalQuorumPercent) {
-        this.approvalQuorumPercent = approvalQuorumPercent;
     }
 
     public Long getSlaMinutes() {
@@ -424,6 +427,47 @@ public class ApprovalPolicyStage extends ActiveEntity {
 
     public Integer getMaximumReminders() {
         return maximumReminders;
+    }
+
+    /**
+     * Sets the quorum count.
+     *
+     * @param quorumCount quorum count
+     */
+    public void setQuorumCount(Integer quorumCount) {
+
+        if (quorumCount == null || quorumCount < 1) {
+            throw new IllegalArgumentException(
+                    "Quorum count must be greater than zero.");
+        }
+
+        this.quorumCount = quorumCount;
+    }
+
+    /**
+     * Returns whether a quorum has been configured.
+     *
+     * @return true if quorum exists
+     */
+    public boolean hasQuorum() {
+        return quorumCount != null && quorumCount > 0;
+    }
+
+    /**
+     * Increases the quorum requirement.
+     */
+    public void increaseQuorum() {
+        quorumCount++;
+    }
+
+    /**
+     * Decreases the quorum requirement.
+     */
+    public void decreaseQuorum() {
+
+        if (quorumCount > 1) {
+            quorumCount--;
+        }
     }
 
     public void setMaximumReminders(Integer maximumReminders) {
@@ -586,11 +630,11 @@ public class ApprovalPolicyStage extends ActiveEntity {
                     "Execution order must be greater than zero.");
         }
 
-        if (minimumApprovals != null
+        if (requiredApprovals != null
                 && maximumApprovals != null
-                && minimumApprovals > maximumApprovals) {
+                && requiredApprovals > maximumApprovals) {
             throw new IllegalStateException(
-                    "Minimum approvals cannot exceed maximum approvals.");
+                    "Required approvals cannot exceed maximum approvals.");
         }
 
         if (!optionalStage && approvers.isEmpty()) {
@@ -598,10 +642,11 @@ public class ApprovalPolicyStage extends ActiveEntity {
                     "A mandatory approval stage must contain at least one approver.");
         }
 
-        if (approvalQuorumPercent != null
-                && (approvalQuorumPercent < 1 || approvalQuorumPercent > 100)) {
+        if (decisionMode == ApprovalStepDecisionMode.QUORUM
+                && !hasQuorum()) {
+
             throw new IllegalStateException(
-                    "Approval quorum percentage must be between 1 and 100.");
+                    "Quorum count must be greater than zero when decision mode is QUORUM.");
         }
     }
 
