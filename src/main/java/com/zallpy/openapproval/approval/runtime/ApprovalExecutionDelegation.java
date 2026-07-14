@@ -35,16 +35,14 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "approval_execution_delegations", indexes = {
-        @Index(name = "idx_execution_delegation_execution",
-                columnList = "approval_execution_id"),
-        @Index(name = "idx_execution_delegation_stage",
-                columnList = "approval_execution_stage_id"),
-        @Index(name = "idx_execution_delegation_task",
-                columnList = "approval_execution_task_id"),
-        @Index(name = "idx_execution_delegation_reference",
-                columnList = "delegation_reference"),
-        @Index(name = "idx_execution_delegation_active",
-                columnList = "active")
+        @Index(name = "idx_execution_delegation_execution", columnList = "approval_execution_id"),
+        @Index(name = "idx_execution_delegation_stage", columnList = "approval_execution_stage_id"),
+        @Index(name = "idx_execution_delegation_task", columnList = "approval_execution_task_id"),
+        @Index(name = "idx_execution_delegation_reference", columnList = "delegation_reference"),
+        @Index(name = "idx_execution_delegation_active", columnList = "active"),
+        @Index(name = "idx_execution_delegation_status", columnList = "status"),
+        @Index(name = "idx_execution_delegation_to_approver", columnList = "to_approver_id"),
+        @Index(name = "idx_execution_delegation_from_approver", columnList = "from_approver_id"),
 })
 public class ApprovalExecutionDelegation extends ActiveEntity {
 
@@ -79,9 +77,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      * Unique delegation identifier.
      */
     @NotNull
-    @Column(name = "delegation_uuid",
-            nullable = false,
-            unique = true)
+    @Column(name = "delegation_uuid", nullable = false, unique = true)
     private UUID delegationUuid = UUID.randomUUID();
 
     /**
@@ -89,10 +85,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 100)
-    @Column(name = "delegation_reference",
-            nullable = false,
-            unique = true,
-            length = 100)
+    @Column(name = "delegation_reference", nullable = false, unique = true, length = 100)
     private String delegationReference;
 
     /**
@@ -100,20 +93,15 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "status",
-            nullable = false,
-            length = 40)
-    private ApprovalDelegationStatus status =
-            ApprovalDelegationStatus.PENDING;
+    @Column(name = "status", nullable = false, length = 40)
+    private ApprovalDelegationStatus status = ApprovalDelegationStatus.PENDING;
 
     /**
      * Business reason for the delegation.
      */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "delegation_reason",
-            nullable = false,
-            length = 50)
+    @Column(name = "delegation_reason", nullable = false, length = 50)
     private ApprovalDelegationReason delegationReason;
 
     /**
@@ -121,9 +109,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 100)
-    @Column(name = "from_approver_id",
-            nullable = false,
-            length = 100)
+    @Column(name = "from_approver_id", nullable = false, length = 100)
     private String fromApproverId;
 
     /**
@@ -131,9 +117,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 200)
-    @Column(name = "from_approver_name",
-            nullable = false,
-            length = 200)
+    @Column(name = "from_approver_name", nullable = false, length = 200)
     private String fromApproverName;
 
     /**
@@ -141,9 +125,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 100)
-    @Column(name = "to_approver_id",
-            nullable = false,
-            length = 100)
+    @Column(name = "to_approver_id", nullable = false, length = 100)
     private String toApproverId;
 
     /**
@@ -151,20 +133,17 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     @NotBlank
     @Size(max = 200)
-    @Column(name = "to_approver_name",
-            nullable = false,
-            length = 200)
+    @Column(name = "to_approver_name", nullable = false, length = 200)
     private String toApproverName;
 
     /**
      * Delegate email.
      */
     @Size(max = 255)
-    @Column(name = "to_approver_email",
-            length = 255)
+    @Column(name = "to_approver_email", length = 255)
     private String toApproverEmail;
 
-        /**
+    /**
      * Date and time the delegation occurred.
      */
     @NotNull
@@ -327,7 +306,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
                 && !metadata.isBlank();
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Getters and Setters
     // -------------------------------------------------------------------------
 
@@ -471,7 +450,7 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
         this.metadata = metadata;
     }
 
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Validation
     // -------------------------------------------------------------------------
 
@@ -482,6 +461,10 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
      */
     public void validateConfiguration() {
 
+        if (isSelfDelegation()) {
+            throw new IllegalStateException(
+                    "An approver cannot delegate to themselves.");
+        }
         if (approvalExecution == null) {
             throw new IllegalStateException(
                     "Approval execution is required.");
@@ -574,6 +557,10 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
         return acceptedAt != null;
     }
 
+    public boolean isPending() {
+        return status == ApprovalDelegationStatus.PENDING;
+    }
+
     /**
      * Returns whether this delegation has been completed.
      *
@@ -602,6 +589,15 @@ public class ApprovalExecutionDelegation extends ActiveEntity {
 
         return fromApproverId != null
                 && fromApproverId.equals(toApproverId);
+    }
+
+    public boolean isTerminalState() {
+
+        return status == ApprovalDelegationStatus.COMPLETED
+                || status == ApprovalDelegationStatus.CANCELLED
+                || status == ApprovalDelegationStatus.DECLINED
+                || status == ApprovalDelegationStatus.EXPIRED
+                || status == ApprovalDelegationStatus.REVOKED;
     }
 
     @Override
