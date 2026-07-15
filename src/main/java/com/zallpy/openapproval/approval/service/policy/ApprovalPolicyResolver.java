@@ -2,6 +2,8 @@ package com.zallpy.openapproval.approval.service.policy;
 
 import java.util.UUID;
 
+import com.zallpy.openapproval.approval.entity.ApprovalPolicy;
+
 /**
  * Resolves approval policies used by the approval engine.
  *
@@ -24,9 +26,9 @@ public interface ApprovalPolicyResolver {
      * Resolves an approval policy using its unique policy code.
      *
      * @param policyCode approval policy code
-     * @return approval policy identifier
+     * @return approval policy
      */
-    UUID resolvePolicyId(String policyCode);
+     ApprovalPolicy resolve(String policyCode);
 
     /**
      * Determines whether a policy exists.

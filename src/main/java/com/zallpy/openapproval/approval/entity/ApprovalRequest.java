@@ -1,7 +1,11 @@
 package com.zallpy.openapproval.approval.entity;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zallpy.openapproval.approval.enums.ApprovalStatus;
 import com.zallpy.openapproval.common.entity.BaseEntity;
+import com.zallpy.openapproval.common.exception.ApprovalValidationException;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,6 +20,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -694,6 +699,91 @@ public class ApprovalRequest extends BaseEntity {
 
         return attributes != null
                 && !attributes.isBlank();
+    }
+
+    public void setRequestReference(final String requestReference) {
+        this.requestReference = requestReference;
+    }
+
+    public void setResourceType(final String resourceType) {
+        this.resourceType = resourceType;
+    }
+
+    public void setResourceId(final UUID resourceId) {
+        this.resourceId = resourceId;
+    }
+
+    public void setStatus(final ApprovalStatus status) {
+        this.status = status;
+    }
+
+    public void setSubmittedBy(final UUID submittedBy) {
+        this.submittedBy = submittedBy;
+    }
+
+    public void setSubmittedAt(final LocalDateTime submittedAt) {
+        this.submittedAt = submittedAt;
+    }
+
+    public void setCompleted(final boolean completed) {
+        this.completed = completed;
+    }
+
+    public void setCompletedAt(final LocalDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+
+    public void setCompletedBy(final UUID completedBy) {
+        this.completedBy = completedBy;
+    }
+
+    public void setCancelled(final boolean cancelled) {
+        this.cancelled = cancelled;
+    }
+
+    public void setCancelledAt(final LocalDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
+    public void setCancelledBy(final UUID cancelledBy) {
+        this.cancelledBy = cancelledBy;
+    }
+
+    public void setCancellationReason(final String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public void setRecalled(final boolean recalled) {
+        this.recalled = recalled;
+    }
+
+    public void setRecalledAt(final LocalDateTime recalledAt) {
+        this.recalledAt = recalledAt;
+    }
+
+    public void setRecalledBy(final UUID recalledBy) {
+        this.recalledBy = recalledBy;
+    }
+
+    public void setRecallReason(final String recallReason) {
+        this.recallReason = recallReason;
+    }
+
+    public void setAttributes(final Map<String, Object> attributes) {
+
+        if (attributes == null || attributes.isEmpty()) {
+            this.attributes = null;
+            return;
+        }
+
+        try {
+            this.attributes = new ObjectMapper()
+                    .writeValueAsString(attributes);
+        } catch (JsonProcessingException ex) {
+            throw new ApprovalValidationException(
+                    "Unable to serialize approval attributes.",
+                    ex);
+        }
     }
 
 }

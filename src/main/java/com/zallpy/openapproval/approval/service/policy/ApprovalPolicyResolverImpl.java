@@ -24,15 +24,12 @@ public class ApprovalPolicyResolverImpl
     private final ApprovalPolicyRepository approvalPolicyRepository;
 
     @Override
-    public UUID resolvePolicyId(final String policyCode) {
+    public ApprovalPolicy resolve(final String policyCode) {
 
-        ApprovalPolicy policy = approvalPolicyRepository
+        return approvalPolicyRepository
                 .findByPolicyCode(policyCode)
-                .orElseThrow(() ->
-                        new ApprovalValidationException(
-                                "Approval policy [" + policyCode + "] was not found."));
-
-        return policy.getId();
+                .orElseThrow(() -> new ApprovalValidationException(
+                        "Approval policy [" + policyCode + "] was not found."));
     }
 
     @Override
