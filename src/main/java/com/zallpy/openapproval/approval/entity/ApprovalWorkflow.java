@@ -15,6 +15,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +42,8 @@ import java.util.UUID;
 @Table(name = "oa_approval_workflow", indexes = {
         @Index(name = "idx_workflow_reference", columnList = "workflow_reference"),
         @Index(name = "idx_workflow_status", columnList = "status"),
-        @Index(name = "idx_workflow_started_at", columnList = "started_at")
+        @Index(name = "idx_workflow_started_at", columnList = "started_at"),
+        @Index(name = "idx_workflow_awaiting_approval", columnList = "awaiting_approval")
 })
 public class ApprovalWorkflow extends BaseEntity {
 
@@ -55,19 +57,14 @@ public class ApprovalWorkflow extends BaseEntity {
     /**
      * Workflow reference.
      */
-    @Column(name = "workflow_reference",
-            nullable = false,
-            unique = true,
-            length = 100)
+    @Column(name = "workflow_reference", nullable = false, unique = true, length = 100)
     private String workflowReference;
 
     /**
      * Current workflow status.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status",
-            nullable = false,
-            length = 50)
+    @Column(name = "status", nullable = false, length = 50)
     private ApprovalStatus status = ApprovalStatus.PENDING;
 
     /**
@@ -91,15 +88,13 @@ public class ApprovalWorkflow extends BaseEntity {
     /**
      * Indicates whether this workflow has completed.
      */
-    @Column(name = "completed",
-            nullable = false)
+    @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
     /**
      * Indicates whether this workflow has been cancelled.
      */
-    @Column(name = "cancelled",
-            nullable = false)
+    @Column(name = "cancelled", nullable = false)
     private boolean cancelled = false;
 
     /**
@@ -117,15 +112,13 @@ public class ApprovalWorkflow extends BaseEntity {
     /**
      * Cancellation reason.
      */
-    @Column(name = "cancellation_reason",
-            length = 2000)
+    @Column(name = "cancellation_reason", length = 2000)
     private String cancellationReason;
 
     /**
      * Indicates whether the workflow has been rejected.
      */
-    @Column(name = "rejected",
-            nullable = false)
+    @Column(name = "rejected", nullable = false)
     private boolean rejected = false;
 
     /**
@@ -143,64 +136,59 @@ public class ApprovalWorkflow extends BaseEntity {
     /**
      * Rejection reason.
      */
-    @Column(name = "rejection_reason",
-            length = 2000)
+    @Column(name = "rejection_reason", length = 2000)
     private String rejectionReason;
 
     /**
      * Total number of approval steps.
      */
-    @Column(name = "total_steps",
-            nullable = false)
+    @Column(name = "total_steps", nullable = false)
     private Integer totalSteps = 0;
 
     /**
      * Number of pending approval steps.
      */
-    @Column(name = "pending_steps",
-            nullable = false)
+    @Column(name = "pending_steps", nullable = false)
     private Integer pendingSteps = 0;
 
     /**
      * Number of approved steps.
      */
-    @Column(name = "approved_steps",
-            nullable = false)
+    @Column(name = "approved_steps", nullable = false)
     private Integer approvedSteps = 0;
 
     /**
      * Number of rejected steps.
      */
-    @Column(name = "rejected_steps",
-            nullable = false)
+    @Column(name = "rejected_steps", nullable = false)
     private Integer rejectedSteps = 0;
 
     /**
      * Number of delegated steps.
      */
-    @Column(name = "delegated_steps",
-            nullable = false)
+    @Column(name = "delegated_steps", nullable = false)
     private Integer delegatedSteps = 0;
 
     /**
      * Number of escalated steps.
      */
-    @Column(name = "escalated_steps",
-            nullable = false)
+    @Column(name = "escalated_steps", nullable = false)
     private Integer escalatedSteps = 0;
+
+    /**
+     * Indicates whether the workflow is currently awaiting approval.
+     */
+    @Column(name = "awaiting_approval", nullable = false)
+    private boolean awaitingApproval = true;
 
     /**
      * Runtime approval steps.
      */
-    @OneToMany(
-            mappedBy = "approvalWorkflow",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
-    )
+    @OneToMany(mappedBy = "approvalWorkflow", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<ApprovalStep> approvalSteps = new LinkedHashSet<>();
 
-        /* ==========================================================
+    /*
+     * ==========================================================
      * Getters
      * ==========================================================
      */
@@ -349,7 +337,17 @@ public class ApprovalWorkflow extends BaseEntity {
         return escalatedSteps;
     }
 
-    /* ==========================================================
+    /**
+     * Determines whether the workflow is awaiting approval.
+     *
+     * @return true if awaiting approval
+     */
+    public boolean isAwaitingApproval() {
+        return awaitingApproval;
+    }
+
+    /*
+     * ==========================================================
      * Controlled Setters
      * ==========================================================
      */
@@ -391,7 +389,17 @@ public class ApprovalWorkflow extends BaseEntity {
         this.workflowReference = workflowReference;
     }
 
-    /* ==========================================================
+    /**
+     * Updates the awaiting approval flag.
+     *
+     * @param awaitingApproval awaiting approval flag
+     */
+    public void setAwaitingApproval(final boolean awaitingApproval) {
+        this.awaitingApproval = awaitingApproval;
+    }
+
+    /*
+     * ==========================================================
      * Relationship Management
      * ==========================================================
      */
@@ -443,15 +451,15 @@ public class ApprovalWorkflow extends BaseEntity {
      */
     public void clearApprovalSteps() {
 
-        this.approvalSteps.forEach(step ->
-                step.setApprovalWorkflow(null));
+        this.approvalSteps.forEach(step -> step.setApprovalWorkflow(null));
 
         this.approvalSteps.clear();
 
         recalculateStatistics();
     }
 
-        /* ==========================================================
+    /*
+     * ==========================================================
      * Lifecycle
      * ==========================================================
      */
@@ -467,7 +475,9 @@ public class ApprovalWorkflow extends BaseEntity {
 
         this.status = ApprovalStatus.IN_PROGRESS;
 
-        activateNextStep();
+        this.awaitingApproval = true;
+
+        activateFirstStep();
 
         recalculateStatistics();
     }
@@ -480,8 +490,11 @@ public class ApprovalWorkflow extends BaseEntity {
     public void complete(final UUID completedBy) {
 
         this.completed = true;
+        this.awaitingApproval = false;
+
         this.completedAt = LocalDateTime.now();
         this.completedBy = completedBy;
+
         this.status = ApprovalStatus.APPROVED;
 
         approvalSteps.forEach(ApprovalStep::deactivate);
@@ -493,16 +506,18 @@ public class ApprovalWorkflow extends BaseEntity {
      * Rejects the workflow.
      *
      * @param rejectedBy rejecting user
-     * @param reason rejection reason
+     * @param reason     rejection reason
      */
     public void reject(final UUID rejectedBy,
-                       final String reason) {
+            final String reason) {
 
         this.rejected = true;
         this.rejectedBy = rejectedBy;
         this.rejectedAt = LocalDateTime.now();
         this.rejectionReason = reason;
         this.status = ApprovalStatus.REJECTED;
+
+        this.awaitingApproval = false;
 
         approvalSteps.forEach(ApprovalStep::deactivate);
 
@@ -513,23 +528,25 @@ public class ApprovalWorkflow extends BaseEntity {
      * Cancels the workflow.
      *
      * @param cancelledBy cancelling user
-     * @param reason cancellation reason
+     * @param reason      cancellation reason
      */
     public void cancel(final UUID cancelledBy,
-                       final String reason) {
+            final String reason) {
 
         this.cancelled = true;
         this.cancelledBy = cancelledBy;
         this.cancelledAt = LocalDateTime.now();
         this.cancellationReason = reason;
         this.status = ApprovalStatus.CANCELLED;
+        this.awaitingApproval = false;
 
         approvalSteps.forEach(ApprovalStep::deactivate);
 
         recalculateStatistics();
     }
 
-    /* ==========================================================
+    /*
+     * ==========================================================
      * Runtime Execution
      * ==========================================================
      */
@@ -539,7 +556,7 @@ public class ApprovalWorkflow extends BaseEntity {
      *
      * @return current approval step or {@code null}
      */
-    public ApprovalStep getCurrentStep() {
+    public ApprovalStep getCurrentApprovalStep() {
 
         return approvalSteps.stream()
                 .filter(ApprovalStep::isCurrentStep)
@@ -554,16 +571,7 @@ public class ApprovalWorkflow extends BaseEntity {
      */
     public ApprovalStep activateNextStep() {
 
-        approvalSteps.forEach(ApprovalStep::deactivate);
-
-        ApprovalStep nextStep = approvalSteps.stream()
-                .filter(ApprovalStep::isPending)
-                .sorted((left, right) ->
-                        Integer.compare(
-                                left.getStageOrder(),
-                                right.getStageOrder()))
-                .findFirst()
-                .orElse(null);
+        ApprovalStep nextStep = getNextApprovalStep();
 
         if (nextStep != null) {
             nextStep.activate();
@@ -580,7 +588,7 @@ public class ApprovalWorkflow extends BaseEntity {
      * @return true if a current step exists
      */
     public boolean hasCurrentStep() {
-        return getCurrentStep() != null;
+        return getCurrentApprovalStep() != null;
     }
 
     /**
@@ -606,7 +614,8 @@ public class ApprovalWorkflow extends BaseEntity {
                 .allMatch(ApprovalStep::isCompleted);
     }
 
-        /* ==========================================================
+    /*
+     * ==========================================================
      * Business Rules
      * ==========================================================
      */
@@ -693,7 +702,8 @@ public class ApprovalWorkflow extends BaseEntity {
                 && approvalRequest.equals(this.approvalRequest);
     }
 
-    /* ==========================================================
+    /*
+     * ==========================================================
      * Internal Helpers
      * ==========================================================
      */
@@ -707,7 +717,7 @@ public class ApprovalWorkflow extends BaseEntity {
      * workflow statistics.
      * </p>
      */
-    private void recalculateStatistics() {
+    public void recalculateStatistics() {
 
         this.totalSteps = approvalSteps.size();
 
@@ -730,6 +740,37 @@ public class ApprovalWorkflow extends BaseEntity {
         this.escalatedSteps = (int) approvalSteps.stream()
                 .filter(ApprovalStep::isEscalated)
                 .count();
+    }
+
+    public ApprovalStep getNextApprovalStep() {
+
+        return approvalSteps.stream()
+                .filter(ApprovalStep::isPending)
+                .sorted(Comparator.comparing(ApprovalStep::getStageOrder))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public boolean hasNextStep() {
+        return getNextApprovalStep() != null;
+    }
+
+    public boolean isFullyRejected() {
+        return rejectedSteps > 0;
+    }
+
+    public void deactivateCurrentStep() {
+
+        ApprovalStep current = getCurrentApprovalStep();
+
+        if (current != null) {
+            current.deactivate();
+        }
+
+    }
+
+    public void activateFirstStep() {
+        activateNextStep();
     }
 
 }
