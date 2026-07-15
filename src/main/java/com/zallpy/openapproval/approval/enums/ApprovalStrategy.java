@@ -50,6 +50,8 @@ public enum ApprovalStrategy {
     /**
      * More than half of the assigned approvers must approve.
      */
-    MAJORITY
+    MAJORITY,
+
+    QUORUM
 
 }

@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.zallpy.openapproval.approval.event.ApprovalDomainEventPublisher;
+import com.zallpy.openapproval.approval.event.ApprovalSubmittedEvent;
+
 /**
  * Default implementation of {@link ApprovalSubmissionService}.
  *
@@ -33,6 +36,8 @@ public class ApprovalSubmissionServiceImpl
         private final ApprovalValidationService validationService;
 
         private final ApprovalPolicyResolver policyResolverService;
+
+        private final ApprovalDomainEventPublisher eventPublisher;
 
         /**
          * Will be introduced in Batch 2.
@@ -82,13 +87,17 @@ public class ApprovalSubmissionServiceImpl
                  */
                 approvalRequest = approvalRequestRepository.save(approvalRequest);
 
+                eventPublisher.publish(
+                                new ApprovalSubmittedEvent(
+                                                approvalRequest.getId(),
+                                                workflow.getId(),
+                                                approvalRequest.getSubmittedBy()));
+
                 /*
                  * Response creation continues in Part 2.
                  */
                 return buildSubmissionResponse(approvalRequest);
         }
-
-       
 
         /**
          * Builds the submission response.
@@ -123,7 +132,5 @@ public class ApprovalSubmissionServiceImpl
 
                 return response;
         }
-
-
 
 }

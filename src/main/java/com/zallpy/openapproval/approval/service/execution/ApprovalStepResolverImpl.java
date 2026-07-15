@@ -6,6 +6,10 @@ import com.zallpy.openapproval.common.exception.ApprovalValidationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.zallpy.openapproval.approval.event.ApprovalDomainEventPublisher;
+import com.zallpy.openapproval.approval.event.ApprovalStepActivatedEvent;
+import lombok.RequiredArgsConstructor;
+
 /**
  * Default implementation of {@link ApprovalStepResolver}.
  *
@@ -17,9 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
  * @since 1.0.0
  */
 @Service
+@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ApprovalStepResolverImpl
         implements ApprovalStepResolver {
+
+    private final ApprovalDomainEventPublisher eventPublisher;
 
     /**
      * {@inheritDoc}
@@ -44,6 +51,12 @@ public class ApprovalStepResolverImpl
             throw new ApprovalValidationException(
                     "Current approval step cannot be executed.");
         }
+
+        eventPublisher.publish(
+                new ApprovalStepActivatedEvent(
+                        workflow.getId(),
+                        currentStep.getId(),
+                        currentStep.getApproverId()));
 
         return currentStep;
     }

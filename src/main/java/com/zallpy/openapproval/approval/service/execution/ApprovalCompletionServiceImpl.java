@@ -5,8 +5,11 @@ import com.zallpy.openapproval.approval.entity.ApprovalWorkflow;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import com.zallpy.openapproval.approval.event.ApprovalDomainEventPublisher;
+import com.zallpy.openapproval.approval.event.ApprovalWorkflowCompletedEvent;
+
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Default implementation of {@link ApprovalCompletionService}.
@@ -19,9 +22,12 @@ import java.util.UUID;
  * @since 1.0.0
  */
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class ApprovalCompletionServiceImpl
         implements ApprovalCompletionService {
+
+    private final ApprovalDomainEventPublisher eventPublisher;
 
     /**
      * {@inheritDoc}
@@ -36,7 +42,14 @@ public class ApprovalCompletionServiceImpl
         ApprovalRequest request = workflow.getApprovalRequest();
 
         if (request != null) {
+
             request.complete(completedBy);
+
+            eventPublisher.publish(
+                    new ApprovalWorkflowCompletedEvent(
+                            workflow.getId(),
+                            request.getId(),
+                            completedBy));
         }
     }
 
