@@ -10,7 +10,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -21,12 +20,18 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Represents the runtime execution of an approval process.
+ * Represents the runtime execution of an approval request.
  *
  * <p>
- * Every {@link ApprovalRequest} owns exactly one ApprovalWorkflow.
- * The workflow manages the execution of approval steps from submission
- * until final approval, rejection, cancellation, or recall.
+ * An {@code ApprovalWorkflow} is created when an
+ * {@link ApprovalRequest} is submitted to the approval engine.
+ * It is responsible for tracking workflow execution,
+ * approval progress and runtime statistics until completion.
+ * </p>
+ *
+ * <p>
+ * A workflow owns one or more {@link ApprovalStep}s which are
+ * executed according to the configured {@link ApprovalPolicy}.
  * </p>
  *
  * @author Zallpy
@@ -34,46 +39,45 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "oa_approval_workflow", indexes = {
+        @Index(name = "idx_workflow_reference", columnList = "workflow_reference"),
         @Index(name = "idx_workflow_status", columnList = "status"),
-        @Index(name = "idx_workflow_current_stage", columnList = "current_stage_order"),
         @Index(name = "idx_workflow_started_at", columnList = "started_at")
 })
 public class ApprovalWorkflow extends BaseEntity {
 
     /**
-     * Parent approval request.
+     * Business approval request.
      */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "approval_request_id", nullable = false, unique = true)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "approval_request_id", nullable = false)
     private ApprovalRequest approvalRequest;
 
     /**
-     * Runtime approval steps.
+     * Workflow reference.
      */
-    @OneToMany(mappedBy = "approvalWorkflow", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Set<ApprovalStep> approvalSteps = new LinkedHashSet<>();
+    @Column(name = "workflow_reference",
+            nullable = false,
+            unique = true,
+            length = 100)
+    private String workflowReference;
 
     /**
-     * Workflow status.
+     * Current workflow status.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 50)
+    @Column(name = "status",
+            nullable = false,
+            length = 50)
     private ApprovalStatus status = ApprovalStatus.PENDING;
 
     /**
-     * Current stage number.
+     * Workflow start timestamp.
      */
-    @Column(name = "current_stage_order")
-    private Integer currentStageOrder = 1;
-
-    /**
-     * Workflow start time.
-     */
-    @Column(name = "started_at", nullable = false)
+    @Column(name = "started_at")
     private LocalDateTime startedAt;
 
     /**
-     * Workflow completion time.
+     * Workflow completion timestamp.
      */
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
@@ -85,19 +89,21 @@ public class ApprovalWorkflow extends BaseEntity {
     private UUID completedBy;
 
     /**
-     * Indicates whether the workflow has completed.
+     * Indicates whether this workflow has completed.
      */
-    @Column(name = "completed", nullable = false)
+    @Column(name = "completed",
+            nullable = false)
     private boolean completed = false;
 
     /**
-     * Indicates whether the workflow has been cancelled.
+     * Indicates whether this workflow has been cancelled.
      */
-    @Column(name = "cancelled", nullable = false)
+    @Column(name = "cancelled",
+            nullable = false)
     private boolean cancelled = false;
 
     /**
-     * Date and time the workflow was cancelled.
+     * Workflow cancellation timestamp.
      */
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
@@ -111,101 +117,246 @@ public class ApprovalWorkflow extends BaseEntity {
     /**
      * Cancellation reason.
      */
-    @Column(name = "cancellation_reason", length = 2000)
+    @Column(name = "cancellation_reason",
+            length = 2000)
     private String cancellationReason;
 
     /**
-     * Indicates whether the workflow has been recalled.
+     * Indicates whether the workflow has been rejected.
      */
-    @Column(name = "recalled", nullable = false)
-    private boolean recalled = false;
+    @Column(name = "rejected",
+            nullable = false)
+    private boolean rejected = false;
 
     /**
-     * Date and time the workflow was recalled.
+     * Workflow rejection timestamp.
      */
-    @Column(name = "recalled_at")
-    private LocalDateTime recalledAt;
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
 
     /**
-     * User that recalled the workflow.
+     * User that rejected the workflow.
      */
-    @Column(name = "recalled_by")
-    private UUID recalledBy;
+    @Column(name = "rejected_by")
+    private UUID rejectedBy;
 
     /**
-     * Recall reason.
+     * Rejection reason.
      */
-    @Column(name = "recall_reason", length = 2000)
-    private String recallReason;
-
-    /**
-     * Workflow due date.
-     */
-    @Column(name = "due_at")
-    private LocalDateTime dueAt;
-
-    /**
-     * Indicates whether the workflow has timed out.
-     */
-    @Column(name = "timed_out", nullable = false)
-    private boolean timedOut = false;
-
-    /**
-     * Date and time the workflow timed out.
-     */
-    @Column(name = "timed_out_at")
-    private LocalDateTime timedOutAt;
-
-    /**
-     * Number of completed approval steps.
-     */
-    @Column(name = "approved_steps", nullable = false)
-    private Integer approvedSteps = 0;
-
-    /**
-     * Number of rejected approval steps.
-     */
-    @Column(name = "rejected_steps", nullable = false)
-    private Integer rejectedSteps = 0;
-
-    /**
-     * Number of pending approval steps.
-     */
-    @Column(name = "pending_steps", nullable = false)
-    private Integer pendingSteps = 0;
+    @Column(name = "rejection_reason",
+            length = 2000)
+    private String rejectionReason;
 
     /**
      * Total number of approval steps.
      */
-    @Column(name = "total_steps", nullable = false)
+    @Column(name = "total_steps",
+            nullable = false)
     private Integer totalSteps = 0;
 
     /**
-     * Current approver responsible for the active step.
+     * Number of pending approval steps.
      */
-    @Column(name = "current_approver_id")
-    private UUID currentApproverId;
+    @Column(name = "pending_steps",
+            nullable = false)
+    private Integer pendingSteps = 0;
 
     /**
-     * Indicates whether the workflow is currently waiting
-     * for an approver action.
+     * Number of approved steps.
      */
-    @Column(name = "awaiting_approval", nullable = false)
-    private boolean awaitingApproval = true;
+    @Column(name = "approved_steps",
+            nullable = false)
+    private Integer approvedSteps = 0;
 
     /**
-     * Additional runtime metadata stored by the engine.
+     * Number of rejected steps.
+     */
+    @Column(name = "rejected_steps",
+            nullable = false)
+    private Integer rejectedSteps = 0;
+
+    /**
+     * Number of delegated steps.
+     */
+    @Column(name = "delegated_steps",
+            nullable = false)
+    private Integer delegatedSteps = 0;
+
+    /**
+     * Number of escalated steps.
+     */
+    @Column(name = "escalated_steps",
+            nullable = false)
+    private Integer escalatedSteps = 0;
+
+    /**
+     * Runtime approval steps.
+     */
+    @OneToMany(
+            mappedBy = "approvalWorkflow",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    private Set<ApprovalStep> approvalSteps = new LinkedHashSet<>();
+
+        /* ==========================================================
+     * Getters
+     * ==========================================================
+     */
+
+    /**
+     * Returns the approval request.
      *
-     * <p>
-     * Typically serialized as JSON.
-     * </p>
+     * @return approval request
      */
-    @Lob
-    @Column(name = "runtime_metadata")
-    private String runtimeMetadata;
+    public ApprovalRequest getApprovalRequest() {
+        return approvalRequest;
+    }
 
     /**
-     * Assigns the approval request.
+     * Returns the workflow reference.
+     *
+     * @return workflow reference
+     */
+    public String getWorkflowReference() {
+        return workflowReference;
+    }
+
+    /**
+     * Returns the workflow status.
+     *
+     * @return workflow status
+     */
+    public ApprovalStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Returns the workflow start time.
+     *
+     * @return started at
+     */
+    public LocalDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    /**
+     * Returns the workflow completion time.
+     *
+     * @return completed at
+     */
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    /**
+     * Returns the completion user.
+     *
+     * @return completed by
+     */
+    public UUID getCompletedBy() {
+        return completedBy;
+    }
+
+    /**
+     * Returns whether the workflow is completed.
+     *
+     * @return true if completed
+     */
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    /**
+     * Returns whether the workflow is cancelled.
+     *
+     * @return true if cancelled
+     */
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    /**
+     * Returns whether the workflow is rejected.
+     *
+     * @return true if rejected
+     */
+    public boolean isRejected() {
+        return rejected;
+    }
+
+    /**
+     * Returns the approval steps.
+     *
+     * @return approval steps
+     */
+    public Set<ApprovalStep> getApprovalSteps() {
+        return approvalSteps;
+    }
+
+    /**
+     * Returns the total number of steps.
+     *
+     * @return total steps
+     */
+    public Integer getTotalSteps() {
+        return totalSteps;
+    }
+
+    /**
+     * Returns the number of pending steps.
+     *
+     * @return pending steps
+     */
+    public Integer getPendingSteps() {
+        return pendingSteps;
+    }
+
+    /**
+     * Returns the number of approved steps.
+     *
+     * @return approved steps
+     */
+    public Integer getApprovedSteps() {
+        return approvedSteps;
+    }
+
+    /**
+     * Returns the number of rejected steps.
+     *
+     * @return rejected steps
+     */
+    public Integer getRejectedSteps() {
+        return rejectedSteps;
+    }
+
+    /**
+     * Returns the number of delegated steps.
+     *
+     * @return delegated steps
+     */
+    public Integer getDelegatedSteps() {
+        return delegatedSteps;
+    }
+
+    /**
+     * Returns the number of escalated steps.
+     *
+     * @return escalated steps
+     */
+    public Integer getEscalatedSteps() {
+        return escalatedSteps;
+    }
+
+    /* ==========================================================
+     * Controlled Setters
+     * ==========================================================
+     */
+
+    /**
+     * Assigns the approval request while maintaining the
+     * bidirectional relationship.
      *
      * @param approvalRequest approval request
      */
@@ -213,10 +364,37 @@ public class ApprovalWorkflow extends BaseEntity {
 
         this.approvalRequest = approvalRequest;
 
-        if (approvalRequest != null && approvalRequest.getWorkflow() != this) {
+        if (approvalRequest != null
+                && approvalRequest.getWorkflow() != this) {
             approvalRequest.setWorkflow(this);
         }
     }
+
+    /**
+     * Updates the workflow status.
+     *
+     * @param status workflow status
+     */
+    public void setStatus(final ApprovalStatus status) {
+
+        if (status != null) {
+            this.status = status;
+        }
+    }
+
+    /**
+     * Updates the workflow reference.
+     *
+     * @param workflowReference workflow reference
+     */
+    public void setWorkflowReference(final String workflowReference) {
+        this.workflowReference = workflowReference;
+    }
+
+    /* ==========================================================
+     * Relationship Management
+     * ==========================================================
+     */
 
     /**
      * Adds an approval step.
@@ -235,8 +413,8 @@ public class ApprovalWorkflow extends BaseEntity {
 
         approvalStep.setApprovalWorkflow(this);
         this.approvalSteps.add(approvalStep);
-        this.totalSteps = this.approvalSteps.size();
-        this.pendingSteps = this.totalSteps - this.approvedSteps - this.rejectedSteps;
+
+        recalculateStatistics();
     }
 
     /**
@@ -250,184 +428,308 @@ public class ApprovalWorkflow extends BaseEntity {
             return;
         }
 
+        if (!this.approvalSteps.contains(approvalStep)) {
+            return;
+        }
+
         approvalStep.setApprovalWorkflow(null);
         this.approvalSteps.remove(approvalStep);
-        this.totalSteps = this.approvalSteps.size();
-        this.pendingSteps = this.totalSteps - this.approvedSteps - this.rejectedSteps;
+
+        recalculateStatistics();
     }
 
     /**
-     * Marks the workflow as completed.
+     * Removes all approval steps.
+     */
+    public void clearApprovalSteps() {
+
+        this.approvalSteps.forEach(step ->
+                step.setApprovalWorkflow(null));
+
+        this.approvalSteps.clear();
+
+        recalculateStatistics();
+    }
+
+        /* ==========================================================
+     * Lifecycle
+     * ==========================================================
+     */
+
+    /**
+     * Starts workflow execution.
+     */
+    public void start() {
+
+        if (this.startedAt == null) {
+            this.startedAt = LocalDateTime.now();
+        }
+
+        this.status = ApprovalStatus.IN_PROGRESS;
+
+        activateNextStep();
+
+        recalculateStatistics();
+    }
+
+    /**
+     * Completes the workflow.
      *
-     * @param completedBy user that completed the workflow
+     * @param completedBy user completing the workflow
      */
     public void complete(final UUID completedBy) {
 
         this.completed = true;
         this.completedAt = LocalDateTime.now();
         this.completedBy = completedBy;
-        this.awaitingApproval = false;
+        this.status = ApprovalStatus.APPROVED;
+
+        approvalSteps.forEach(ApprovalStep::deactivate);
+
+        recalculateStatistics();
+    }
+
+    /**
+     * Rejects the workflow.
+     *
+     * @param rejectedBy rejecting user
+     * @param reason rejection reason
+     */
+    public void reject(final UUID rejectedBy,
+                       final String reason) {
+
+        this.rejected = true;
+        this.rejectedBy = rejectedBy;
+        this.rejectedAt = LocalDateTime.now();
+        this.rejectionReason = reason;
+        this.status = ApprovalStatus.REJECTED;
+
+        approvalSteps.forEach(ApprovalStep::deactivate);
+
+        recalculateStatistics();
     }
 
     /**
      * Cancels the workflow.
      *
-     * @param cancelledBy user cancelling the workflow
-     * @param reason      cancellation reason
+     * @param cancelledBy cancelling user
+     * @param reason cancellation reason
      */
     public void cancel(final UUID cancelledBy,
-            final String reason) {
+                       final String reason) {
 
         this.cancelled = true;
-        this.cancelledAt = LocalDateTime.now();
         this.cancelledBy = cancelledBy;
+        this.cancelledAt = LocalDateTime.now();
         this.cancellationReason = reason;
-        this.awaitingApproval = false;
+        this.status = ApprovalStatus.CANCELLED;
+
+        approvalSteps.forEach(ApprovalStep::deactivate);
+
+        recalculateStatistics();
     }
 
+    /* ==========================================================
+     * Runtime Execution
+     * ==========================================================
+     */
+
     /**
-     * Recalls the workflow.
+     * Returns the current active approval step.
      *
-     * @param recalledBy user recalling the workflow
-     * @param reason     recall reason
+     * @return current approval step or {@code null}
      */
-    public void recall(final UUID recalledBy,
-            final String reason) {
+    public ApprovalStep getCurrentStep() {
 
-        this.recalled = true;
-        this.recalledAt = LocalDateTime.now();
-        this.recalledBy = recalledBy;
-        this.recallReason = reason;
-        this.awaitingApproval = false;
+        return approvalSteps.stream()
+                .filter(ApprovalStep::isCurrentStep)
+                .findFirst()
+                .orElse(null);
     }
 
     /**
-     * Marks the workflow as timed out.
+     * Activates the next pending approval step.
+     *
+     * @return activated approval step or {@code null}
      */
-    public void timeout() {
+    public ApprovalStep activateNextStep() {
 
-        this.timedOut = true;
-        this.timedOutAt = LocalDateTime.now();
-        this.awaitingApproval = false;
-    }
+        approvalSteps.forEach(ApprovalStep::deactivate);
 
-    /**
-     * Increments the number of approved steps.
-     */
-    public void incrementApprovedSteps() {
+        ApprovalStep nextStep = approvalSteps.stream()
+                .filter(ApprovalStep::isPending)
+                .sorted((left, right) ->
+                        Integer.compare(
+                                left.getStageOrder(),
+                                right.getStageOrder()))
+                .findFirst()
+                .orElse(null);
 
-        this.approvedSteps++;
-        this.pendingSteps = Math.max(0, this.pendingSteps - 1);
-    }
-
-    /**
-     * Increments the number of rejected steps.
-     */
-    public void incrementRejectedSteps() {
-
-        this.rejectedSteps++;
-        this.pendingSteps = Math.max(0, this.pendingSteps - 1);
-    }
-
-    /**
-     * Advances to the next stage.
-     */
-    public void advanceToNextStage() {
-
-        if (this.currentStageOrder == null) {
-            this.currentStageOrder = 1;
-        } else {
-            this.currentStageOrder++;
+        if (nextStep != null) {
+            nextStep.activate();
         }
+
+        recalculateStatistics();
+
+        return nextStep;
     }
 
     /**
-     * Returns whether the workflow is active.
+     * Determines whether a current active step exists.
      *
-     * @return true if active
+     * @return true if a current step exists
      */
-    public boolean isActive() {
-
-        return !completed
-                && !cancelled
-                && !recalled
-                && !timedOut;
+    public boolean hasCurrentStep() {
+        return getCurrentStep() != null;
     }
 
     /**
-     * Returns whether the workflow is in a terminal state.
+     * Determines whether pending approval steps exist.
      *
-     * @return true if terminal
+     * @return true if pending steps exist
      */
-    public boolean isTerminal() {
+    public boolean hasPendingSteps() {
 
-        return completed
-                || cancelled
-                || recalled
-                || timedOut;
+        return approvalSteps.stream()
+                .anyMatch(ApprovalStep::isPending);
     }
 
     /**
-     * Returns whether the workflow is executable.
+     * Determines whether all approval steps
+     * have completed execution.
      *
-     * @return true if executable
+     * @return true if all steps are completed
+     */
+    public boolean allStepsCompleted() {
+
+        return approvalSteps.stream()
+                .allMatch(ApprovalStep::isCompleted);
+    }
+
+        /* ==========================================================
+     * Business Rules
+     * ==========================================================
+     */
+
+    /**
+     * Determines whether this workflow can be executed.
+     *
+     * @return {@code true} if executable
      */
     public boolean isExecutable() {
 
         return approvalRequest != null
-                && !approvalSteps.isEmpty()
-                && isActive();
+                && !completed
+                && !cancelled
+                && !rejected
+                && !approvalSteps.isEmpty();
     }
 
     /**
-     * Returns whether the workflow has a due date.
+     * Determines whether this workflow is currently running.
      *
-     * @return true if due date exists
+     * @return {@code true} if running
      */
-    public boolean hasDueDate() {
-        return dueAt != null;
+    public boolean isRunning() {
+
+        return startedAt != null
+                && !completed
+                && !cancelled
+                && !rejected;
     }
 
     /**
-     * Returns whether the workflow is overdue.
+     * Determines whether this workflow has reached
+     * a terminal state.
      *
-     * @return true if overdue
+     * @return {@code true} if terminal
      */
-    public boolean isOverdue() {
-
-        return dueAt != null
-                && LocalDateTime.now().isAfter(dueAt)
-                && !isTerminal();
+    public boolean isTerminal() {
+        return completed || cancelled || rejected;
     }
 
     /**
-     * Returns whether the workflow is awaiting approval.
+     * Determines whether this workflow contains no approval steps.
      *
-     * @return true if awaiting approval
+     * @return {@code true} if empty
      */
-    public boolean isAwaitingApproval() {
-        return awaitingApproval;
-    }
-
-    public ApprovalRequest getApprovalRequest() {
-        return approvalRequest;
+    public boolean isEmpty() {
+        return approvalSteps.isEmpty();
     }
 
     /**
-     * Returns whether this workflow has completed.
+     * Determines whether workflow execution can advance.
      *
-     * @return true if completed
+     * @return {@code true} if another step can be activated
      */
-    public boolean isCompleted() {
-        return completed;
+    public boolean canAdvance() {
+
+        return isRunning()
+                && hasPendingSteps();
     }
 
     /**
-     * Returns whether this workflow has been cancelled.
+     * Determines whether the workflow can be completed.
      *
-     * @return true if cancelled
+     * @return {@code true} if completion is allowed
      */
-    public boolean isCancelled() {
-        return cancelled;
+    public boolean canComplete() {
+
+        return !approvalSteps.isEmpty()
+                && allStepsCompleted()
+                && rejectedSteps == 0;
     }
+
+    /**
+     * Determines whether the workflow belongs to
+     * the supplied approval request.
+     *
+     * @param approvalRequest approval request
+     * @return {@code true} if matching
+     */
+    public boolean belongsTo(final ApprovalRequest approvalRequest) {
+
+        return approvalRequest != null
+                && approvalRequest.equals(this.approvalRequest);
+    }
+
+    /* ==========================================================
+     * Internal Helpers
+     * ==========================================================
+     */
+
+    /**
+     * Recalculates workflow statistics from the current
+     * approval step collection.
+     *
+     * <p>
+     * This method is the single source of truth for runtime
+     * workflow statistics.
+     * </p>
+     */
+    private void recalculateStatistics() {
+
+        this.totalSteps = approvalSteps.size();
+
+        this.pendingSteps = (int) approvalSteps.stream()
+                .filter(ApprovalStep::isPending)
+                .count();
+
+        this.approvedSteps = (int) approvalSteps.stream()
+                .filter(ApprovalStep::isApproved)
+                .count();
+
+        this.rejectedSteps = (int) approvalSteps.stream()
+                .filter(ApprovalStep::isRejected)
+                .count();
+
+        this.delegatedSteps = (int) approvalSteps.stream()
+                .filter(ApprovalStep::isDelegated)
+                .count();
+
+        this.escalatedSteps = (int) approvalSteps.stream()
+                .filter(ApprovalStep::isEscalated)
+                .count();
+    }
+
 }

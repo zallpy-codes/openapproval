@@ -17,17 +17,18 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Represents a single executable approval step within an approval workflow.
+ * Runtime approval step executed within an {@link ApprovalWorkflow}.
  *
  * <p>
- * An {@code ApprovalStep} is the runtime representation of an
- * {@link ApprovalStage}. It is assigned to an approver and records the
- * approver's decision during workflow execution.
+ * An {@code ApprovalStep} is created from an {@link ApprovalStage} when an
+ * approval workflow starts. It represents the actual work assigned to a
+ * specific approver.
  * </p>
  *
  * <p>
- * Each approval workflow consists of one or more approval steps executed
- * according to the configured approval strategy.
+ * Unlike {@link ApprovalStage}, which is configuration, this entity stores
+ * runtime execution information such as approval decisions, delegation,
+ * escalation, reminders and timeout processing.
  * </p>
  *
  * @author Zallpy
@@ -36,6 +37,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "oa_approval_step", indexes = {
         @Index(name = "idx_step_workflow", columnList = "approval_workflow_id"),
+        @Index(name = "idx_step_stage", columnList = "approval_stage_id"),
         @Index(name = "idx_step_stage_order", columnList = "stage_order"),
         @Index(name = "idx_step_approver", columnList = "approver_id"),
         @Index(name = "idx_step_status", columnList = "status")
@@ -43,7 +45,7 @@ import java.util.UUID;
 public class ApprovalStep extends BaseEntity {
 
     /**
-     * Parent approval workflow.
+     * Parent workflow.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "approval_workflow_id", nullable = false)
@@ -57,50 +59,50 @@ public class ApprovalStep extends BaseEntity {
     private ApprovalStage approvalStage;
 
     /**
-     * Stage execution order.
+     * Execution order.
      */
     @Column(name = "stage_order", nullable = false)
     private Integer stageOrder;
 
     /**
-     * User assigned to perform this approval.
+     * User responsible for this approval.
      */
     @Column(name = "approver_id", nullable = false)
     private UUID approverId;
 
     /**
-     * Display name of the approver.
+     * Approver display name.
      */
     @Column(name = "approver_name", length = 200)
     private String approverName;
 
     /**
-     * Current execution status.
+     * Runtime approval status.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private ApprovalStatus status = ApprovalStatus.PENDING;
 
     /**
-     * Indicates whether this is the current active approval step.
+     * Indicates whether this is the active workflow step.
      */
     @Column(name = "current_step", nullable = false)
     private boolean currentStep = false;
 
     /**
-     * Indicates whether this step has been completed.
+     * Indicates whether execution has completed.
      */
     @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
     /**
-     * Date and time the approval decision was made.
+     * Decision timestamp.
      */
     @Column(name = "decision_at")
     private LocalDateTime decisionAt;
 
     /**
-     * User that recorded the approval decision.
+     * User that made the decision.
      */
     @Column(name = "decision_by")
     private UUID decisionBy;
@@ -112,43 +114,43 @@ public class ApprovalStep extends BaseEntity {
     private String decisionComment;
 
     /**
-     * Indicates whether this step has been delegated.
+     * Indicates whether delegation occurred.
      */
     @Column(name = "delegated", nullable = false)
     private boolean delegated = false;
 
     /**
-     * User that delegated this approval.
+     * User that delegated the step.
      */
     @Column(name = "delegated_by")
     private UUID delegatedBy;
 
     /**
-     * User to whom this approval was delegated.
+     * New approver after delegation.
      */
     @Column(name = "delegated_to")
     private UUID delegatedTo;
 
     /**
-     * Date and time delegation occurred.
+     * Delegation timestamp.
      */
     @Column(name = "delegated_at")
     private LocalDateTime delegatedAt;
 
     /**
-     * Indicates whether this step has been escalated.
+     * Indicates whether escalation occurred.
      */
     @Column(name = "escalated", nullable = false)
     private boolean escalated = false;
 
     /**
-     * Date and time escalation occurred.
+     * Escalation timestamp.
      */
     @Column(name = "escalated_at")
     private LocalDateTime escalatedAt;
 
     /**
-     * User that received the escalated approval.
+     * User receiving the escalation.
      */
     @Column(name = "escalated_to")
     private UUID escalatedTo;
@@ -160,52 +162,218 @@ public class ApprovalStep extends BaseEntity {
     private Integer reminderCount = 0;
 
     /**
-     * Indicates whether this approval step has timed out.
+     * Indicates whether timeout occurred.
      */
     @Column(name = "timed_out", nullable = false)
     private boolean timedOut = false;
 
     /**
-     * Date and time this approval step timed out.
+     * Timeout timestamp.
      */
     @Column(name = "timed_out_at")
     private LocalDateTime timedOutAt;
 
     /**
-     * Due date for this approval step.
+     * Due date for this approval.
      */
     @Column(name = "due_at")
     private LocalDateTime dueAt;
 
     /**
-     * Additional runtime metadata.
-     *
-     * <p>
-     * This field may contain serialized JSON produced by the
-     * approval engine for auditing or integration purposes.
-     * </p>
+     * Runtime metadata.
      */
     @Lob
     @Column(name = "runtime_metadata")
     private String runtimeMetadata;
 
+    /*
+     * ==========================================================
+     * Relationship Management
+     * ==========================================================
+     */
+
     /**
-     * Assigns the parent approval workflow.
+     * Assigns the parent workflow.
      *
-     * @param approvalWorkflow approval workflow
+     * @param approvalWorkflow parent workflow
      */
     public void setApprovalWorkflow(final ApprovalWorkflow approvalWorkflow) {
         this.approvalWorkflow = approvalWorkflow;
     }
 
     /**
-     * Assigns the approval stage.
+     * Assigns the source approval stage.
      *
      * @param approvalStage approval stage
      */
     public void setApprovalStage(final ApprovalStage approvalStage) {
         this.approvalStage = approvalStage;
     }
+
+    /**
+     * Assigns the execution order.
+     *
+     * @param stageOrder execution order
+     */
+    public void setStageOrder(final Integer stageOrder) {
+        this.stageOrder = stageOrder;
+    }
+
+    /**
+     * Assigns the approver.
+     *
+     * @param approverId approver identifier
+     */
+    public void setApproverId(final UUID approverId) {
+        this.approverId = approverId;
+    }
+
+    /**
+     * Assigns the approver display name.
+     *
+     * @param approverName approver name
+     */
+    public void setApproverName(final String approverName) {
+        this.approverName = approverName;
+    }
+
+    /**
+     * Assigns the due date.
+     *
+     * @param dueAt due date
+     */
+    public void setDueAt(final LocalDateTime dueAt) {
+        this.dueAt = dueAt;
+    }
+
+    /**
+     * Assigns runtime metadata.
+     *
+     * @param runtimeMetadata runtime metadata
+     */
+    public void setRuntimeMetadata(final String runtimeMetadata) {
+        this.runtimeMetadata = runtimeMetadata;
+    }
+
+    /*
+     * ==========================================================
+     * Getters
+     * ==========================================================
+     */
+
+    /**
+     * Returns the parent workflow.
+     *
+     * @return approval workflow
+     */
+    public ApprovalWorkflow getApprovalWorkflow() {
+        return approvalWorkflow;
+    }
+
+    /**
+     * Returns the source approval stage.
+     *
+     * @return approval stage
+     */
+    public ApprovalStage getApprovalStage() {
+        return approvalStage;
+    }
+
+    /**
+     * Returns the stage execution order.
+     *
+     * @return stage order
+     */
+    public Integer getStageOrder() {
+        return stageOrder;
+    }
+
+    /**
+     * Returns the assigned approver.
+     *
+     * @return approver identifier
+     */
+    public UUID getApproverId() {
+        return approverId;
+    }
+
+    /**
+     * Returns the approver name.
+     *
+     * @return approver name
+     */
+    public String getApproverName() {
+        return approverName;
+    }
+
+    /**
+     * Returns the approval status.
+     *
+     * @return approval status
+     */
+    public ApprovalStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Returns the decision timestamp.
+     *
+     * @return decision time
+     */
+    public LocalDateTime getDecisionAt() {
+        return decisionAt;
+    }
+
+    /**
+     * Returns the decision maker.
+     *
+     * @return decision maker
+     */
+    public UUID getDecisionBy() {
+        return decisionBy;
+    }
+
+    /**
+     * Returns the decision comment.
+     *
+     * @return decision comment
+     */
+    public String getDecisionComment() {
+        return decisionComment;
+    }
+
+    /**
+     * Returns the reminder count.
+     *
+     * @return reminder count
+     */
+    public Integer getReminderCount() {
+        return reminderCount;
+    }
+
+    /**
+     * Returns the due date.
+     *
+     * @return due date
+     */
+    public LocalDateTime getDueAt() {
+        return dueAt;
+    }
+
+    /**
+     * Returns runtime metadata.
+     *
+     * @return runtime metadata
+     */
+    public String getRuntimeMetadata() {
+        return runtimeMetadata;
+    }
+
+    /*
+     * ==========================================================
+     * Runtime Lifecycle
+     * ==========================================================
+     */
 
     /**
      * Approves this step.
@@ -242,7 +410,7 @@ public class ApprovalStep extends BaseEntity {
     }
 
     /**
-     * Delegates this step.
+     * Delegates this approval step.
      *
      * @param delegatedBy delegating user
      * @param delegatedTo new approver
@@ -261,7 +429,7 @@ public class ApprovalStep extends BaseEntity {
     /**
      * Escalates this approval step.
      *
-     * @param escalatedTo escalated approver
+     * @param escalatedTo new approver
      */
     public void escalate(final UUID escalatedTo) {
 
@@ -273,7 +441,7 @@ public class ApprovalStep extends BaseEntity {
     }
 
     /**
-     * Marks this approval step as timed out.
+     * Marks this step as timed out.
      */
     public void timeout() {
 
@@ -283,7 +451,7 @@ public class ApprovalStep extends BaseEntity {
     }
 
     /**
-     * Increments the reminder notification count.
+     * Increments reminder count.
      */
     public void incrementReminderCount() {
 
@@ -295,7 +463,7 @@ public class ApprovalStep extends BaseEntity {
     }
 
     /**
-     * Marks this step as the current active step.
+     * Activates this step.
      */
     public void activate() {
         this.currentStep = true;
@@ -308,37 +476,88 @@ public class ApprovalStep extends BaseEntity {
         this.currentStep = false;
     }
 
+    /*
+     * ==========================================================
+     * Business Helpers
+     * ==========================================================
+     */
+
+    /**
+     * Determines whether this is the current active step.
+     *
+     * @return {@code true} if current
+     */
+    public boolean isCurrentStep() {
+        return currentStep;
+    }
+
+    /**
+     * Determines whether this step has completed.
+     *
+     * @return {@code true} if completed
+     */
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    /**
+     * Determines whether this step has been delegated.
+     *
+     * @return {@code true} if delegated
+     */
+    public boolean isDelegated() {
+        return delegated;
+    }
+
+    /**
+     * Determines whether this step has been escalated.
+     *
+     * @return {@code true} if escalated
+     */
+    public boolean isEscalated() {
+        return escalated;
+    }
+
+    /**
+     * Determines whether this step has timed out.
+     *
+     * @return {@code true} if timed out
+     */
+    public boolean isTimedOut() {
+        return timedOut;
+    }
+
     /**
      * Determines whether this step is pending.
      *
-     * @return true if pending
+     * @return {@code true} if pending
      */
     public boolean isPending() {
-        return ApprovalStatus.PENDING.equals(this.status);
+        return ApprovalStatus.PENDING.equals(status);
     }
 
     /**
      * Determines whether this step has been approved.
      *
-     * @return true if approved
+     * @return {@code true} if approved
      */
     public boolean isApproved() {
-        return ApprovalStatus.APPROVED.equals(this.status);
+        return ApprovalStatus.APPROVED.equals(status);
     }
 
     /**
      * Determines whether this step has been rejected.
      *
-     * @return true if rejected
+     * @return {@code true} if rejected
      */
     public boolean isRejected() {
-        return ApprovalStatus.REJECTED.equals(this.status);
+        return ApprovalStatus.REJECTED.equals(status);
     }
 
     /**
      * Determines whether this step is executable.
      *
-     * @return true if executable
+     * @return {@code true} if executable
      */
     public boolean isExecutable() {
 
@@ -352,7 +571,7 @@ public class ApprovalStep extends BaseEntity {
     /**
      * Determines whether this step has a due date.
      *
-     * @return true if due date exists
+     * @return {@code true} if a due date exists
      */
     public boolean hasDueDate() {
         return dueAt != null;
@@ -361,13 +580,214 @@ public class ApprovalStep extends BaseEntity {
     /**
      * Determines whether this step is overdue.
      *
-     * @return true if overdue
+     * @return {@code true} if overdue
      */
     public boolean isOverdue() {
 
         return dueAt != null
                 && LocalDateTime.now().isAfter(dueAt)
                 && !completed;
+    }
+
+    /**
+     * Determines whether this step can accept a decision.
+     *
+     * @return {@code true} if a decision can be recorded
+     */
+    public boolean canExecute() {
+
+        return isExecutable()
+                && isPending();
+    }
+
+    /**
+     * Determines whether delegation is allowed.
+     *
+     * @return {@code true} if delegation is allowed
+     */
+    public boolean canDelegate() {
+
+        return isPending()
+                && !completed
+                && !delegated;
+    }
+
+    /**
+     * Determines whether escalation is allowed.
+     *
+     * @return {@code true} if escalation is allowed
+     */
+    public boolean canEscalate() {
+
+        return isPending()
+                && !completed
+                && !escalated;
+    }
+
+    /**
+     * Determines whether timeout processing is allowed.
+     *
+     * @return {@code true} if timeout can occur
+     */
+    public boolean canTimeout() {
+
+        return isPending()
+                && !completed
+                && !timedOut
+                && hasDueDate()
+                && isOverdue();
+    }
+
+    /*
+     * ==========================================================
+     * Additional Getters
+     * ==========================================================
+     */
+
+    /**
+     * Returns the user that received delegation.
+     *
+     * @return delegated user
+     */
+    public UUID getDelegatedTo() {
+        return delegatedTo;
+    }
+
+    /**
+     * Returns the user that performed delegation.
+     *
+     * @return delegating user
+     */
+    public UUID getDelegatedBy() {
+        return delegatedBy;
+    }
+
+    /**
+     * Returns delegation timestamp.
+     *
+     * @return delegation timestamp
+     */
+    public LocalDateTime getDelegatedAt() {
+        return delegatedAt;
+    }
+
+    /**
+     * Returns escalation recipient.
+     *
+     * @return escalated user
+     */
+    public UUID getEscalatedTo() {
+        return escalatedTo;
+    }
+
+    /**
+     * Returns escalation timestamp.
+     *
+     * @return escalation timestamp
+     */
+    public LocalDateTime getEscalatedAt() {
+        return escalatedAt;
+    }
+
+    /**
+     * Returns timeout timestamp.
+     *
+     * @return timeout timestamp
+     */
+    public LocalDateTime getTimedOutAt() {
+        return timedOutAt;
+    }
+
+
+
+    /**
+     * Returns the current approval status.
+     *
+     * @return approval status
+     */
+    public ApprovalStatus getApprovalStatus() {
+        return status;
+    }
+
+    /**
+     * Returns the workflow identifier.
+     *
+     * @return workflow identifier or {@code null}
+     */
+    public UUID getWorkflowId() {
+
+        return approvalWorkflow == null
+                ? null
+                : approvalWorkflow.getId();
+    }
+
+    /**
+     * Returns the approval stage identifier.
+     *
+     * @return approval stage identifier or {@code null}
+     */
+    public UUID getStageId() {
+
+        return approvalStage == null
+                ? null
+                : approvalStage.getId();
+    }
+
+    /**
+     * Determines whether this step belongs to the supplied workflow.
+     *
+     * @param workflow approval workflow
+     * @return {@code true} if it belongs to the workflow
+     */
+    public boolean belongsTo(final ApprovalWorkflow workflow) {
+
+        return workflow != null
+                && workflow.equals(this.approvalWorkflow);
+    }
+
+    /**
+     * Determines whether this step belongs to the supplied stage.
+     *
+     * @param stage approval stage
+     * @return {@code true} if it belongs to the stage
+     */
+    public boolean belongsTo(final ApprovalStage stage) {
+
+        return stage != null
+                && stage.equals(this.approvalStage);
+    }
+
+    /**
+     * Clears all runtime execution information.
+     *
+     * <p>
+     * Intended for workflow rebuilding or administrative recovery.
+     * </p>
+     */
+    public void reset() {
+
+        this.status = ApprovalStatus.PENDING;
+
+        this.currentStep = false;
+        this.completed = false;
+
+        this.decisionAt = null;
+        this.decisionBy = null;
+        this.decisionComment = null;
+
+        this.delegated = false;
+        this.delegatedAt = null;
+        this.delegatedBy = null;
+        this.delegatedTo = null;
+
+        this.escalated = false;
+        this.escalatedAt = null;
+        this.escalatedTo = null;
+
+        this.timedOut = false;
+        this.timedOutAt = null;
+
+        this.reminderCount = 0;
     }
 
 }

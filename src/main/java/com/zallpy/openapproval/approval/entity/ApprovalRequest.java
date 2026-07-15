@@ -2,19 +2,29 @@ package com.zallpy.openapproval.approval.entity;
 
 import com.zallpy.openapproval.approval.enums.ApprovalStatus;
 import com.zallpy.openapproval.common.entity.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Represents a business request submitted to the OpenApproval engine.
+ * Represents a business request submitted to the OpenApproval Engine.
  *
  * <p>
  * Every approval initiated by a client application creates exactly one
  * {@code ApprovalRequest}. The request references the approval policy
- * that governs its execution and owns the runtime workflow responsible
- * for processing approvals.
+ * that governs its execution and owns the runtime approval workflow.
  * </p>
  *
  * <p>
@@ -23,8 +33,8 @@ import java.util.UUID;
  * <ul>
  * <li>Purchase Order Approval</li>
  * <li>Leave Request Approval</li>
- * <li>Vendor Registration Approval</li>
  * <li>Expense Approval</li>
+ * <li>Vendor Registration Approval</li>
  * <li>Loan Approval</li>
  * </ul>
  *
@@ -41,7 +51,7 @@ import java.util.UUID;
 public class ApprovalRequest extends BaseEntity {
 
     /**
-     * Unique request reference.
+     * Unique business request reference.
      */
     @Column(name = "request_reference", nullable = false, unique = true, length = 100)
     private String requestReference;
@@ -88,22 +98,22 @@ public class ApprovalRequest extends BaseEntity {
     private UUID submittedBy;
 
     /**
-     * Submission timestamp.
+     * Date and time the request was submitted.
      */
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
     /**
-     * Approval policy used for this request.
+     * Approval policy governing this request.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "approval_policy_id", nullable = false)
     private ApprovalPolicy approvalPolicy;
 
     /**
-     * Runtime workflow for this request.
+     * Runtime workflow.
      */
-    @OneToOne(mappedBy = "approvalRequest", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToOne(mappedBy = "approvalRequest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private ApprovalWorkflow workflow;
 
     /**
@@ -113,49 +123,56 @@ public class ApprovalRequest extends BaseEntity {
     private String businessKey;
 
     /**
-     * Correlation identifier used for distributed tracing.
+     * Correlation identifier for distributed tracing.
      */
     @Column(name = "correlation_id", length = 100)
     private String correlationId;
 
     /**
-     * Priority assigned to this approval request.
+     * Request priority.
      */
     @Column(name = "priority", length = 30)
     private String priority;
 
     /**
-     * Due date for completing the approval request.
+     * Due date for completing this approval.
      */
     @Column(name = "due_date")
     private LocalDateTime dueDate;
 
     /**
-     * Indicates whether the request has been completed.
+     * Additional business attributes supplied by the client.
+     */
+    @Lob
+    @Column(name = "attributes")
+    private String attributes;
+
+    /**
+     * Indicates whether this request has been completed.
      */
     @Column(name = "completed", nullable = false)
     private boolean completed = false;
 
     /**
-     * Date and time the request was completed.
+     * Date and time completion occurred.
      */
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     /**
-     * User that completed the approval request.
+     * User that completed the request.
      */
     @Column(name = "completed_by")
     private UUID completedBy;
 
     /**
-     * Indicates whether the request has been cancelled.
+     * Indicates whether this request has been cancelled.
      */
     @Column(name = "cancelled", nullable = false)
     private boolean cancelled = false;
 
     /**
-     * Date and time the request was cancelled.
+     * Date and time cancellation occurred.
      */
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
@@ -167,19 +184,19 @@ public class ApprovalRequest extends BaseEntity {
     private UUID cancelledBy;
 
     /**
-     * Reason for cancelling the request.
+     * Cancellation reason.
      */
     @Column(name = "cancellation_reason", length = 2000)
     private String cancellationReason;
 
     /**
-     * Indicates whether the request has been recalled.
+     * Indicates whether this request has been recalled.
      */
     @Column(name = "recalled", nullable = false)
     private boolean recalled = false;
 
     /**
-     * Date and time the request was recalled.
+     * Date and time recall occurred.
      */
     @Column(name = "recalled_at")
     private LocalDateTime recalledAt;
@@ -191,21 +208,292 @@ public class ApprovalRequest extends BaseEntity {
     private UUID recalledBy;
 
     /**
-     * Reason for recalling the request.
+     * Recall reason.
      */
     @Column(name = "recall_reason", length = 2000)
     private String recallReason;
 
-    /**
-     * Additional business attributes supplied by the client
-     * application during submission.
+    /*
+     * ==========================================================
+     * Getters
+     * ==========================================================
      */
-    @Lob
-    @Column(name = "attributes")
-    private String attributes;
 
     /**
-     * Assigns the runtime workflow to this request.
+     * Returns the request reference.
+     *
+     * @return request reference
+     */
+    public String getRequestReference() {
+        return requestReference;
+    }
+
+    /**
+     * Returns the business resource type.
+     *
+     * @return resource type
+     */
+    public String getResourceType() {
+        return resourceType;
+    }
+
+    /**
+     * Returns the business resource identifier.
+     *
+     * @return resource identifier
+     */
+    public UUID getResourceId() {
+        return resourceId;
+    }
+
+    /**
+     * Returns the approval title.
+     *
+     * @return approval title
+     */
+    public String getTitle() {
+        return title;
+    }
+
+    /**
+     * Returns the approval description.
+     *
+     * @return description
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Returns the approval status.
+     *
+     * @return approval status
+     */
+    public ApprovalStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Returns the submitting user.
+     *
+     * @return submitted by
+     */
+    public UUID getSubmittedBy() {
+        return submittedBy;
+    }
+
+    /**
+     * Returns the submission timestamp.
+     *
+     * @return submitted at
+     */
+    public LocalDateTime getSubmittedAt() {
+        return submittedAt;
+    }
+
+    /**
+     * Returns the approval policy.
+     *
+     * @return approval policy
+     */
+    public ApprovalPolicy getApprovalPolicy() {
+        return approvalPolicy;
+    }
+
+    /**
+     * Returns the runtime workflow.
+     *
+     * @return workflow
+     */
+    public ApprovalWorkflow getWorkflow() {
+        return workflow;
+    }
+
+    /**
+     * Returns the business key.
+     *
+     * @return business key
+     */
+    public String getBusinessKey() {
+        return businessKey;
+    }
+
+    /**
+     * Returns the correlation identifier.
+     *
+     * @return correlation identifier
+     */
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    /**
+     * Returns the priority.
+     *
+     * @return priority
+     */
+    public String getPriority() {
+        return priority;
+    }
+
+    /**
+     * Returns the due date.
+     *
+     * @return due date
+     */
+    public LocalDateTime getDueDate() {
+        return dueDate;
+    }
+
+    /**
+     * Returns the additional attributes.
+     *
+     * @return attributes
+     */
+    public String getAttributes() {
+        return attributes;
+    }
+
+    /**
+     * Returns whether this request is completed.
+     *
+     * @return true if completed
+     */
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    /**
+     * Returns whether this request is cancelled.
+     *
+     * @return true if cancelled
+     */
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    /**
+     * Returns whether this request is recalled.
+     *
+     * @return true if recalled
+     */
+    public boolean isRecalled() {
+        return recalled;
+    }
+
+    /**
+     * Returns the completion timestamp.
+     *
+     * @return completion timestamp
+     */
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    /**
+     * Returns the completion user.
+     *
+     * @return completed by
+     */
+    public UUID getCompletedBy() {
+        return completedBy;
+    }
+
+    /**
+     * Returns the cancellation timestamp.
+     *
+     * @return cancelled at
+     */
+    public LocalDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    /**
+     * Returns the cancellation user.
+     *
+     * @return cancelled by
+     */
+    public UUID getCancelledBy() {
+        return cancelledBy;
+    }
+
+    /**
+     * Returns the cancellation reason.
+     *
+     * @return cancellation reason
+     */
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    /**
+     * Returns the recall timestamp.
+     *
+     * @return recalled at
+     */
+    public LocalDateTime getRecalledAt() {
+        return recalledAt;
+    }
+
+    /**
+     * Returns the recall user.
+     *
+     * @return recalled by
+     */
+    public UUID getRecalledBy() {
+        return recalledBy;
+    }
+
+    /**
+     * Returns the recall reason.
+     *
+     * @return recall reason
+     */
+    public String getRecallReason() {
+        return recallReason;
+    }
+
+    /*
+     * ==========================================================
+     * Controlled Setters
+     * ==========================================================
+     */
+
+    public void setTitle(final String title) {
+        this.title = title;
+    }
+
+    public void setDescription(final String description) {
+        this.description = description;
+    }
+
+    public void setPriority(final String priority) {
+        this.priority = priority;
+    }
+
+    public void setBusinessKey(final String businessKey) {
+        this.businessKey = businessKey;
+    }
+
+    public void setCorrelationId(final String correlationId) {
+        this.correlationId = correlationId;
+    }
+
+    public void setDueDate(final LocalDateTime dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public void setAttributes(final String attributes) {
+        this.attributes = attributes;
+    }
+
+    public void setApprovalPolicy(final ApprovalPolicy approvalPolicy) {
+        this.approvalPolicy = approvalPolicy;
+    }
+
+    /**
+     * Assigns the runtime workflow while maintaining the
+     * bidirectional relationship.
      *
      * @param workflow approval workflow
      */
@@ -213,15 +501,22 @@ public class ApprovalRequest extends BaseEntity {
 
         this.workflow = workflow;
 
-        if (workflow != null && workflow.getApprovalRequest() != this) {
+        if (workflow != null
+                && workflow.getApprovalRequest() != this) {
             workflow.setApprovalRequest(this);
         }
     }
 
+    /*
+     * ==========================================================
+     * Lifecycle
+     * ==========================================================
+     */
+
     /**
      * Marks this request as completed.
      *
-     * @param completedBy user that completed the request
+     * @param completedBy user completing the request
      */
     public void complete(final UUID completedBy) {
 
@@ -231,9 +526,9 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Cancels this request.
+     * Cancels this approval request.
      *
-     * @param cancelledBy user cancelling the request
+     * @param cancelledBy cancelling user
      * @param reason      cancellation reason
      */
     public void cancel(final UUID cancelledBy,
@@ -246,9 +541,9 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Recalls this request.
+     * Recalls this approval request.
      *
-     * @param recalledBy user recalling the request
+     * @param recalledBy recalling user
      * @param reason     recall reason
      */
     public void recall(final UUID recalledBy,
@@ -261,7 +556,25 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Determines whether this request is currently active.
+     * Updates the approval status.
+     *
+     * @param status new approval status
+     */
+    public void updateStatus(final ApprovalStatus status) {
+
+        if (status != null) {
+            this.status = status;
+        }
+    }
+
+    /*
+     * ==========================================================
+     * Business Rules
+     * ==========================================================
+     */
+
+    /**
+     * Determines whether this request is active.
      *
      * @return true if active
      */
@@ -273,7 +586,8 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Determines whether this request has reached a terminal state.
+     * Determines whether this request has reached
+     * a terminal state.
      *
      * @return true if terminal
      */
@@ -285,7 +599,7 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Determines whether this request can be processed.
+     * Determines whether this request can be executed.
      *
      * @return true if executable
      */
@@ -293,11 +607,12 @@ public class ApprovalRequest extends BaseEntity {
 
         return approvalPolicy != null
                 && workflow != null
+                && approvalPolicy.isExecutable()
                 && isActive();
     }
 
     /**
-     * Returns whether the request has a due date.
+     * Determines whether this request has a due date.
      *
      * @return true if due date exists
      */
@@ -306,7 +621,7 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Returns whether this request is overdue.
+     * Determines whether this request is overdue.
      *
      * @return true if overdue
      */
@@ -318,34 +633,67 @@ public class ApprovalRequest extends BaseEntity {
     }
 
     /**
-     * Returns whether the request has been cancelled.
+     * Determines whether this request has
+     * an approval policy.
      *
-     * @return true if cancelled
+     * @return true if attached to a policy
      */
-    public boolean isCancelled() {
-        return cancelled;
+    public boolean hasApprovalPolicy() {
+        return approvalPolicy != null;
     }
 
     /**
-     * Returns whether the request has been recalled.
+     * Determines whether this request has
+     * a runtime workflow.
      *
-     * @return true if recalled
+     * @return true if workflow exists
      */
-    public boolean isRecalled() {
-        return recalled;
+    public boolean hasWorkflow() {
+        return workflow != null;
     }
 
     /**
-     * Returns whether the request has been completed.
+     * Determines whether this request
+     * belongs to the specified resource.
      *
-     * @return true if completed
+     * @param resourceType business resource type
+     * @param resourceId   business resource identifier
+     * @return true if matching
      */
-    public boolean isCompleted() {
-        return completed;
+    public boolean belongsTo(final String resourceType,
+            final UUID resourceId) {
+
+        if (resourceType == null || resourceId == null) {
+            return false;
+        }
+
+        return resourceType.equals(this.resourceType)
+                && resourceId.equals(this.resourceId);
     }
 
-    public ApprovalWorkflow getWorkflow() {
-        return workflow;
+    /**
+     * Determines whether this request
+     * was submitted by the supplied user.
+     *
+     * @param userId user identifier
+     * @return true if submitted by user
+     */
+    public boolean isSubmittedBy(final UUID userId) {
+
+        return userId != null
+                && userId.equals(this.submittedBy);
+    }
+
+    /**
+     * Determines whether this request
+     * has additional attributes.
+     *
+     * @return true if attributes exist
+     */
+    public boolean hasAttributes() {
+
+        return attributes != null
+                && !attributes.isBlank();
     }
 
 }

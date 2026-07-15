@@ -28,6 +28,7 @@ import java.util.Set;
  * <li>Approval strategy</li>
  * <li>Approval stages</li>
  * <li>Minimum required approvals</li>
+ * <li>Delegation behaviour</li>
  * <li>Escalation behaviour</li>
  * <li>Timeout behaviour</li>
  * <li>Notification behaviour</li>
@@ -55,7 +56,7 @@ public class ApprovalPolicy extends BaseEntity {
     private String policyCode;
 
     /**
-     * Policy display name.
+     * Human-readable policy name.
      */
     @Column(name = "policy_name", nullable = false, length = 200)
     private String policyName;
@@ -67,16 +68,22 @@ public class ApprovalPolicy extends BaseEntity {
     private String description;
 
     /**
-     * Indicates whether the policy is active.
+     * Indicates whether this policy is active.
      */
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
     /**
-     * Indicates whether this is the default policy.
+     * Indicates whether this is the system default policy.
      */
     @Column(name = "default_policy", nullable = false)
     private boolean defaultPolicy = false;
+
+    /**
+     * Indicates whether this policy is available for new approval requests.
+     */
+    @Column(name = "available_for_use", nullable = false)
+    private boolean availableForUse = true;
 
     /**
      * Approval execution strategy.
@@ -85,16 +92,16 @@ public class ApprovalPolicy extends BaseEntity {
     private ApprovalStrategy approvalStrategy = ApprovalStrategy.SEQUENTIAL;
 
     /**
-     * Number of approvals required before the workflow is considered approved.
+     * Number of approvals required before the workflow is approved.
      */
     @Column(name = "required_approvals", nullable = false)
     private Integer requiredApprovals = 1;
 
     /**
-     * Approval stages configured for this policy.
+     * Approval stages belonging to this policy.
      */
     @OneToMany(mappedBy = "approvalPolicy", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Set<ApprovalStage> stages = new LinkedHashSet<>();
+    private final Set<ApprovalStage> stages = new LinkedHashSet<>();
 
     /**
      * Indicates whether delegation is permitted.
@@ -110,8 +117,8 @@ public class ApprovalPolicy extends BaseEntity {
     private boolean initiatorCanApprove = false;
 
     /**
-     * Indicates whether duplicate approvals by the same
-     * approver are permitted.
+     * Indicates whether duplicate approvals from the same approver
+     * are allowed.
      */
     @Column(name = "allow_duplicate_approval", nullable = false)
     private boolean allowDuplicateApproval = false;
@@ -165,19 +172,19 @@ public class ApprovalPolicy extends BaseEntity {
     private boolean autoRejectOnTimeout = false;
 
     /**
-     * Sends email notifications.
+     * Indicates whether email notifications are enabled.
      */
     @Column(name = "email_notification_enabled", nullable = false)
     private boolean emailNotificationEnabled = true;
 
     /**
-     * Sends in-application notifications.
+     * Indicates whether in-application notifications are enabled.
      */
     @Column(name = "in_app_notification_enabled", nullable = false)
     private boolean inAppNotificationEnabled = true;
 
     /**
-     * Sends SMS notifications.
+     * Indicates whether SMS notifications are enabled.
      */
     @Column(name = "sms_notification_enabled", nullable = false)
     private boolean smsNotificationEnabled = false;
@@ -189,60 +196,333 @@ public class ApprovalPolicy extends BaseEntity {
     private boolean auditEnabled = true;
 
     /**
-     * Indicates whether comments are mandatory during approval.
+     * Indicates whether an approval comment is mandatory.
      */
     @Column(name = "approval_comment_required", nullable = false)
     private boolean approvalCommentRequired = false;
 
     /**
-     * Indicates whether comments are mandatory during rejection.
+     * Indicates whether a rejection comment is mandatory.
      */
     @Column(name = "rejection_comment_required", nullable = false)
     private boolean rejectionCommentRequired = true;
 
-    /**
-     * Indicates whether this policy can be used by new
-     * approval requests.
+    /*
+     * ==========================================================
+     * Basic Getters
+     * ==========================================================
      */
-    @Column(name = "available_for_use", nullable = false)
-    private boolean availableForUse = true;
+
+    /**
+     * Returns the policy code.
+     *
+     * @return policy code
+     */
+    public String getPolicyCode() {
+        return policyCode;
+    }
+
+    /**
+     * Returns the policy name.
+     *
+     * @return policy name
+     */
+    public String getPolicyName() {
+        return policyName;
+    }
+
+    /**
+     * Returns the description.
+     *
+     * @return description
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Returns the approval strategy.
+     *
+     * @return approval strategy
+     */
+    public ApprovalStrategy getApprovalStrategy() {
+        return approvalStrategy;
+    }
+
+    /**
+     * Returns the required approvals.
+     *
+     * @return required approvals
+     */
+    public Integer getRequiredApprovals() {
+        return requiredApprovals;
+    }
+
+    /**
+     * Returns the configured approval stages.
+     *
+     * @return approval stages
+     */
+    public Set<ApprovalStage> getStages() {
+        return stages;
+    }
+
+    /**
+     * Returns whether this policy is active.
+     *
+     * @return true if active
+     */
+    public boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Returns whether this policy is the default policy.
+     *
+     * @return true if default
+     */
+    public boolean isDefaultPolicy() {
+        return defaultPolicy;
+    }
+
+    /**
+     * Returns whether this policy is available for use.
+     *
+     * @return true if available
+     */
+    public boolean isAvailableForUse() {
+        return availableForUse;
+    }
+
+    /**
+     * Returns whether delegation is allowed.
+     *
+     * @return true if delegation is allowed
+     */
+    public boolean isDelegationAllowed() {
+        return delegationAllowed;
+    }
+
+    /**
+     * Returns whether initiators may approve their own requests.
+     *
+     * @return true if allowed
+     */
+    public boolean isInitiatorCanApprove() {
+        return initiatorCanApprove;
+    }
+
+    /**
+     * Returns whether duplicate approvals are allowed.
+     *
+     * @return true if duplicate approvals are allowed
+     */
+    public boolean isAllowDuplicateApproval() {
+        return allowDuplicateApproval;
+    }
+
+    /**
+     * Returns whether reminders are enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isReminderEnabled() {
+        return reminderEnabled;
+    }
+
+    /**
+     * Returns the reminder interval.
+     *
+     * @return reminder interval in minutes
+     */
+    public Integer getReminderIntervalMinutes() {
+        return reminderIntervalMinutes;
+    }
+
+    /**
+     * Returns whether workflow timeout is enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isTimeoutEnabled() {
+        return timeoutEnabled;
+    }
+
+    /**
+     * Returns the workflow timeout in minutes.
+     *
+     * @return timeout in minutes
+     */
+    public Integer getTimeoutMinutes() {
+        return timeoutMinutes;
+    }
+
+    /**
+     * Returns whether escalation is enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isEscalationEnabled() {
+        return escalationEnabled;
+    }
+
+    /**
+     * Returns the escalation timeout.
+     *
+     * @return escalation timeout in minutes
+     */
+    public Integer getEscalationTimeoutMinutes() {
+        return escalationTimeoutMinutes;
+    }
+
+    /**
+     * Returns whether workflows are automatically approved on timeout.
+     *
+     * @return true if enabled
+     */
+    public boolean isAutoApproveOnTimeout() {
+        return autoApproveOnTimeout;
+    }
+
+    /**
+     * Returns whether workflows are automatically rejected on timeout.
+     *
+     * @return true if enabled
+     */
+    public boolean isAutoRejectOnTimeout() {
+        return autoRejectOnTimeout;
+    }
+
+    /**
+     * Returns whether email notifications are enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isEmailNotificationEnabled() {
+        return emailNotificationEnabled;
+    }
+
+    /**
+     * Returns whether in-app notifications are enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isInAppNotificationEnabled() {
+        return inAppNotificationEnabled;
+    }
+
+    /**
+     * Returns whether SMS notifications are enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isSmsNotificationEnabled() {
+        return smsNotificationEnabled;
+    }
+
+    /**
+     * Returns whether audit logging is enabled.
+     *
+     * @return true if enabled
+     */
+    public boolean isAuditEnabled() {
+        return auditEnabled;
+    }
+
+    /**
+     * Returns whether approval comments are required.
+     *
+     * @return true if required
+     */
+    public boolean isApprovalCommentRequired() {
+        return approvalCommentRequired;
+    }
+
+    /**
+     * Returns whether rejection comments are required.
+     *
+     * @return true if required
+     */
+    public boolean isRejectionCommentRequired() {
+        return rejectionCommentRequired;
+    }
+
+    /*
+     * ==========================================================
+     * Controlled Setters
+     * ==========================================================
+     */
+
+    public void setPolicyName(final String policyName) {
+        this.policyName = policyName;
+    }
+
+    public void setDescription(final String description) {
+        this.description = description;
+    }
+
+    public void setApprovalStrategy(final ApprovalStrategy approvalStrategy) {
+        this.approvalStrategy = approvalStrategy;
+    }
+
+    public void setRequiredApprovals(final Integer requiredApprovals) {
+        this.requiredApprovals = requiredApprovals;
+    }
+
+    public void setReminderIntervalMinutes(final Integer reminderIntervalMinutes) {
+        this.reminderIntervalMinutes = reminderIntervalMinutes;
+    }
+
+    public void setTimeoutMinutes(final Integer timeoutMinutes) {
+        this.timeoutMinutes = timeoutMinutes;
+    }
+
+    public void setEscalationTimeoutMinutes(final Integer escalationTimeoutMinutes) {
+        this.escalationTimeoutMinutes = escalationTimeoutMinutes;
+    }
+
+    /*
+     * ==========================================================
+     * Aggregate Relationship Management
+     * ==========================================================
+     */
 
     /**
      * Adds an approval stage to this policy.
      *
-     * @param stage approval stage
+     * @param approvalStage approval stage
      */
-    public void addStage(final ApprovalStage stage) {
+    public void addStage(final ApprovalStage approvalStage) {
 
-        if (stage == null) {
+        if (approvalStage == null) {
             return;
         }
 
-        if (this.stages.contains(stage)) {
+        if (this.stages.contains(approvalStage)) {
             return;
         }
 
-        stage.setApprovalPolicy(this);
-        this.stages.add(stage);
+        approvalStage.setApprovalPolicy(this);
+        this.stages.add(approvalStage);
     }
 
     /**
      * Removes an approval stage from this policy.
      *
-     * @param stage approval stage
+     * @param approvalStage approval stage
      */
-    public void removeStage(final ApprovalStage stage) {
+    public void removeStage(final ApprovalStage approvalStage) {
 
-        if (stage == null) {
+        if (approvalStage == null) {
             return;
         }
 
-        if (!this.stages.contains(stage)) {
+        if (!this.stages.contains(approvalStage)) {
             return;
         }
 
-        stage.setApprovalPolicy(null);
-        this.stages.remove(stage);
+        approvalStage.setApprovalPolicy(null);
+        this.stages.remove(approvalStage);
     }
 
     /**
@@ -254,29 +534,21 @@ public class ApprovalPolicy extends BaseEntity {
         this.stages.clear();
     }
 
-    /**
-     * Returns whether this policy is currently available for execution.
-     *
-     * @return {@code true} if the policy can be used
+    /*
+     * ==========================================================
+     * Lifecycle
+     * ==========================================================
      */
-    public boolean isExecutable() {
-
-        return active
-                && availableForUse
-                && !stages.isEmpty()
-                && requiredApprovals != null
-                && requiredApprovals > 0;
-    }
 
     /**
-     * Enables this policy.
+     * Activates this policy.
      */
     public void activate() {
         this.active = true;
     }
 
     /**
-     * Disables this policy.
+     * Deactivates this policy.
      */
     public void deactivate() {
         this.active = false;
@@ -290,107 +562,170 @@ public class ApprovalPolicy extends BaseEntity {
     }
 
     /**
-     * Removes the default policy designation.
+     * Removes the default designation.
      */
     public void unmarkAsDefault() {
         this.defaultPolicy = false;
     }
 
     /**
-     * Enables delegation.
+     * Makes this policy available for execution.
      */
+    public void makeAvailable() {
+        this.availableForUse = true;
+    }
+
+    /**
+     * Makes this policy unavailable for execution.
+     */
+    public void makeUnavailable() {
+        this.availableForUse = false;
+    }
+
+    /*
+     * ==========================================================
+     * Feature Toggles
+     * ==========================================================
+     */
+
     public void enableDelegation() {
         this.delegationAllowed = true;
     }
 
-    /**
-     * Disables delegation.
-     */
     public void disableDelegation() {
         this.delegationAllowed = false;
     }
 
-    /**
-     * Enables reminders.
-     */
     public void enableReminders() {
         this.reminderEnabled = true;
     }
 
-    /**
-     * Disables reminders.
-     */
     public void disableReminders() {
         this.reminderEnabled = false;
     }
 
-    /**
-     * Enables workflow timeout.
-     */
     public void enableTimeout() {
         this.timeoutEnabled = true;
     }
 
-    /**
-     * Disables workflow timeout.
-     */
     public void disableTimeout() {
         this.timeoutEnabled = false;
     }
 
-    /**
-     * Enables escalation.
-     */
     public void enableEscalation() {
         this.escalationEnabled = true;
     }
 
-    /**
-     * Disables escalation.
-     */
     public void disableEscalation() {
         this.escalationEnabled = false;
     }
 
-    /**
-     * Enables audit logging.
-     */
     public void enableAudit() {
         this.auditEnabled = true;
     }
 
-    /**
-     * Disables audit logging.
-     */
     public void disableAudit() {
         this.auditEnabled = false;
     }
 
-    /**
-     * Returns whether this policy is active.
-     *
-     * @return true if active
+    public void enableEmailNotification() {
+        this.emailNotificationEnabled = true;
+    }
+
+    public void disableEmailNotification() {
+        this.emailNotificationEnabled = false;
+    }
+
+    public void enableInAppNotification() {
+        this.inAppNotificationEnabled = true;
+    }
+
+    public void disableInAppNotification() {
+        this.inAppNotificationEnabled = false;
+    }
+
+    public void enableSmsNotification() {
+        this.smsNotificationEnabled = true;
+    }
+
+    public void disableSmsNotification() {
+        this.smsNotificationEnabled = false;
+    }
+
+    /*
+     * ==========================================================
+     * Business Rules
+     * ==========================================================
      */
-    public boolean isActive() {
-        return active;
+
+    /**
+     * Determines whether this policy is executable by the approval engine.
+     *
+     * @return {@code true} if executable
+     */
+    public boolean isExecutable() {
+
+        return active
+                && availableForUse
+                && approvalStrategy != null
+                && requiredApprovals != null
+                && requiredApprovals > 0
+                && !stages.isEmpty();
     }
 
     /**
-     * Returns the policy code.
+     * Determines whether this policy contains approval stages.
      *
-     * @return policy code
+     * @return {@code true} if stages exist
      */
-    public String getPolicyCode() {
-        return policyCode;
+    public boolean hasStages() {
+        return !this.stages.isEmpty();
     }
 
     /**
-     * Returns the approval stages.
+     * Returns the number of configured approval stages.
      *
-     * @return approval stages
+     * @return stage count
      */
-    public Set<ApprovalStage> getStages() {
-        return stages;
+    public int getStageCount() {
+        return this.stages.size();
+    }
+
+    /**
+     * Determines whether reminder processing is configured.
+     *
+     * @return {@code true} if reminders are enabled
+     */
+    public boolean supportsReminders() {
+        return reminderEnabled && reminderIntervalMinutes != null;
+    }
+
+    /**
+     * Determines whether timeout processing is configured.
+     *
+     * @return {@code true} if timeout is enabled
+     */
+    public boolean supportsTimeout() {
+        return timeoutEnabled && timeoutMinutes != null;
+    }
+
+    /**
+     * Determines whether escalation processing is configured.
+     *
+     * @return {@code true} if escalation is enabled
+     */
+    public boolean supportsEscalation() {
+        return escalationEnabled && escalationTimeoutMinutes != null;
+    }
+
+    /**
+     * Determines whether this policy can automatically complete
+     * a workflow after timeout.
+     *
+     * @return {@code true} if automatic completion is configured
+     */
+    public boolean supportsAutomaticTimeoutDecision() {
+        return autoApproveOnTimeout || autoRejectOnTimeout;
     }
 
 }
